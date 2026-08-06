@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../l10n/strings.dart';
-import '../../../models/narrow_topic.dart';
-import '../../../providers/generation_provider.dart';
 import '../../../theme/app_colors.dart';
 
 const _presetsFr = [
@@ -20,17 +17,23 @@ const _presetsEn = [
   'Narrow the geographic scope',
 ];
 
-class RefineTab extends ConsumerStatefulWidget {
-  final NarrowTopic topic;
+class RefineTab extends StatefulWidget {
   final String language;
+  final bool isRefining;
+  final ValueChanged<String> onSubmit;
 
-  const RefineTab({super.key, required this.topic, required this.language});
+  const RefineTab({
+    super.key,
+    required this.language,
+    required this.isRefining,
+    required this.onSubmit,
+  });
 
   @override
-  ConsumerState<RefineTab> createState() => _RefineTabState();
+  State<RefineTab> createState() => _RefineTabState();
 }
 
-class _RefineTabState extends ConsumerState<RefineTab> {
+class _RefineTabState extends State<RefineTab> {
   final _controller = TextEditingController();
 
   @override
@@ -41,16 +44,13 @@ class _RefineTabState extends ConsumerState<RefineTab> {
 
   void _submit(String instruction) {
     if (instruction.trim().isEmpty) return;
-    ref
-        .read(generationProvider.notifier)
-        .refine(widget.topic, instruction.trim());
+    widget.onSubmit(instruction.trim());
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final s = AppStrings(widget.language);
-    final generation = ref.watch(generationProvider);
     final presets = widget.language == 'fr' ? _presetsFr : _presetsEn;
 
     return Padding(
@@ -64,7 +64,7 @@ class _RefineTabState extends ConsumerState<RefineTab> {
             children: presets.map((preset) {
               return ActionChip(
                 label: Text(preset, style: const TextStyle(fontSize: 12)),
-                onPressed: generation.isLoading ? null : () => _submit(preset),
+                onPressed: widget.isRefining ? null : () => _submit(preset),
                 backgroundColor: colors.teal.withValues(alpha: 0.08),
                 side: BorderSide(color: colors.teal.withValues(alpha: 0.3)),
               );
@@ -80,13 +80,13 @@ class _RefineTabState extends ConsumerState<RefineTab> {
           Align(
             alignment: Alignment.centerRight,
             child: ElevatedButton.icon(
-              onPressed: generation.isLoading
+              onPressed: widget.isRefining
                   ? null
                   : () {
                       _submit(_controller.text);
                       _controller.clear();
                     },
-              icon: generation.isLoading && generation.isRefining
+              icon: widget.isRefining
                   ? SizedBox(
                       width: 14,
                       height: 14,
@@ -96,11 +96,7 @@ class _RefineTabState extends ConsumerState<RefineTab> {
                       ),
                     )
                   : const Icon(LucideIcons.wand2, size: 16),
-              label: Text(
-                generation.isLoading && generation.isRefining
-                    ? s.generating
-                    : s.refineButton,
-              ),
+              label: Text(widget.isRefining ? s.generating : s.refineButton),
             ),
           ),
         ],

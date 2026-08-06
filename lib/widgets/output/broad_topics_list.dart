@@ -6,6 +6,7 @@ import '../../models/broad_topic.dart';
 import '../../models/field_catalog.dart';
 import '../../providers/generation_provider.dart';
 import '../../providers/preference_providers.dart';
+import '../../screens/narrow_topic_screen.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_typography.dart';
 import '../common/markdown_text.dart';
@@ -95,9 +96,23 @@ class BroadTopicsList extends ConsumerWidget {
                       return TextButton.icon(
                         onPressed: generation.isLoading
                             ? null
-                            : () => ref
-                                  .read(generationProvider.notifier)
-                                  .deepDive(topics[i]),
+                            : () async {
+                                final narrow = await ref
+                                    .read(generationProvider.notifier)
+                                    .deepDive(topics[i]);
+                                if (narrow != null && context.mounted) {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => NarrowTopicScreen(
+                                        initialTopic: narrow,
+                                        fieldsCovered:
+                                            topics[i].fieldsCovered,
+                                        language: prefs.language,
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
                         icon: isThisCardLoading
                             ? SizedBox(
                                 width: 16,

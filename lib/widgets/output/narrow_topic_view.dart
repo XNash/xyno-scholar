@@ -17,12 +17,16 @@ class NarrowTopicView extends ConsumerWidget {
   final NarrowTopic topic;
   final List<String> fieldsCovered;
   final String language;
+  final bool isRefining;
+  final ValueChanged<String> onRefine;
 
   const NarrowTopicView({
     super.key,
     required this.topic,
     required this.fieldsCovered,
     required this.language,
+    required this.isRefining,
+    required this.onRefine,
   });
 
   String get _slug => topic.title
@@ -139,7 +143,11 @@ class NarrowTopicView extends ConsumerWidget {
                       child: OutlineTab(parts: topic.suggestedStructure),
                     ),
                     SingleChildScrollView(
-                      child: RefineTab(topic: topic, language: language),
+                      child: RefineTab(
+                        language: language,
+                        isRefining: isRefining,
+                        onSubmit: onRefine,
+                      ),
                     ),
                   ],
                 ),
