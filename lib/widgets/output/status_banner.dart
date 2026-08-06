@@ -5,8 +5,16 @@ import '../../theme/app_colors.dart';
 class StatusBanner extends StatelessWidget {
   final String message;
   final VoidCallback? onDismiss;
+  final VoidCallback? onRetry;
+  final String? retryLabel;
 
-  const StatusBanner({super.key, required this.message, this.onDismiss});
+  const StatusBanner({
+    super.key,
+    required this.message,
+    this.onDismiss,
+    this.onRetry,
+    this.retryLabel,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +40,8 @@ class StatusBanner extends StatelessWidget {
               ).textTheme.bodyMedium?.copyWith(color: colors.ink),
             ),
           ),
+          if (onRetry != null)
+            TextButton(onPressed: onRetry, child: Text(retryLabel ?? 'Retry')),
           if (onDismiss != null)
             IconButton(
               icon: Icon(LucideIcons.x, size: 16, color: colors.inkMuted),

@@ -61,6 +61,7 @@ class AppStrings {
       _fr ? 'Votre texte semble évoquer' : 'Your text seems to mention';
   String get addField => _fr ? 'Ajouter le champ' : 'Add field';
   String get dismiss => _fr ? 'Ignorer' : 'Dismiss';
+  String get retry => _fr ? 'Réessayer' : 'Retry';
 
   // Generate
   String get generateButton => _fr ? 'Générer des sujets' : 'Generate topics';

@@ -29,6 +29,12 @@ class OutputPanel extends ConsumerWidget {
           StatusBanner(
             message: generation.error!,
             onDismiss: () => ref.read(generationProvider.notifier).clearError(),
+            retryLabel: s.retry,
+            onRetry: generation.failedDeepDiveTopic != null
+                ? () => ref
+                      .read(generationProvider.notifier)
+                      .deepDive(generation.failedDeepDiveTopic!)
+                : null,
           ),
         if (generation.isLoading && generation.response == null)
           Padding(

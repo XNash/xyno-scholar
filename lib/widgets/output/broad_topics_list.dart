@@ -88,14 +88,31 @@ class BroadTopicsList extends ConsumerWidget {
                 const SizedBox(height: 12),
                 Align(
                   alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: generation.isLoading
-                        ? null
-                        : () => ref
-                              .read(generationProvider.notifier)
-                              .deepDive(topics[i]),
-                    icon: const Icon(LucideIcons.arrowRight, size: 16),
-                    label: Text(s.deepDive),
+                  child: Builder(
+                    builder: (context) {
+                      final isThisCardLoading =
+                          generation.activeDeepDiveId == topics[i].id;
+                      return TextButton.icon(
+                        onPressed: generation.isLoading
+                            ? null
+                            : () => ref
+                                  .read(generationProvider.notifier)
+                                  .deepDive(topics[i]),
+                        icon: isThisCardLoading
+                            ? SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: colors.amber,
+                                ),
+                              )
+                            : const Icon(LucideIcons.arrowRight, size: 16),
+                        label: Text(
+                          isThisCardLoading ? s.generating : s.deepDive,
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],
