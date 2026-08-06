@@ -41,7 +41,7 @@ dependencies:
   markdown: ^7.3.1
   google_fonts: ^6.2.1
   shared_preferences: ^2.3.3
-  lucide_icons: ^0.257.0
+  lucide_icons_flutter: ^3.1.15
   url_launcher: ^6.3.1
   html_unescape: ^2.0.0
   web: ^1.1.0
