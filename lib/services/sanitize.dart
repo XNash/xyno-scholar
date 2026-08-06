@@ -10,7 +10,16 @@ dynamic sanitizeJsonTree(dynamic value) {
     return _unescape.convert(value);
   }
   if (value is Map) {
-    return value.map((key, v) => MapEntry(key, sanitizeJsonTree(v)));
+    // Built explicitly (rather than via `value.map(...)`) because promoting
+    // a `dynamic` value to `Map` via `is Map` loses the `<String, dynamic>`
+    // type arguments, so `.map()` on it silently returns `Map<dynamic,
+    // dynamic>` — which then fails the `as Map<String, dynamic>` cast at
+    // every call site.
+    final result = <String, dynamic>{};
+    value.forEach((key, v) {
+      result[key as String] = sanitizeJsonTree(v);
+    });
+    return result;
   }
   if (value is List) {
     return value.map(sanitizeJsonTree).toList();

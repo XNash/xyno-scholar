@@ -25,7 +25,10 @@ class CerebrasApiException implements Exception {
 
 class CerebrasClient {
   static const _endpoint = 'https://api.cerebras.ai/v1/chat/completions';
-  static const _model = 'llama-3.3-70b';
+  static const _model = 'zai-glm-4.7';
+  static const _maxTokens = 65000;
+  static const _temperature = 1.0;
+  static const _topP = 0.95;
 
   final http.Client _http;
 
@@ -128,64 +131,88 @@ Rules for populating the schema:
     return trimmed;
   }
 
-  Future<Map<String, dynamic>> _chat({
+  /// Sends [messages] as a streamed chat/completions request and accumulates
+  /// the `delta.content` fragments of each SSE `data:` chunk into the full
+  /// response text. [onProgress] (if given) is invoked with the running
+  /// character count as chunks arrive, purely so the UI can show live
+  /// feedback — the accumulated text itself is only parsed once the stream
+  /// has fully ended (see [_requestJson]), never mid-stream.
+  Future<String> _streamChat({
     required String apiKey,
     required List<Map<String, dynamic>> messages,
+    void Function(int charsReceived)? onProgress,
   }) async {
-    http.Response response;
+    final request = http.Request('POST', Uri.parse(_endpoint))
+      ..headers.addAll({
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $apiKey',
+        'Accept': 'text/event-stream',
+      })
+      ..body = jsonEncode({
+        'model': _model,
+        'stream': true,
+        'max_tokens': _maxTokens,
+        'temperature': _temperature,
+        'top_p': _topP,
+        'messages': messages,
+      });
+
+    http.StreamedResponse streamedResponse;
     try {
-      response = await _http.post(
-        Uri.parse(_endpoint),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $apiKey',
-        },
-        body: jsonEncode({
-          'model': _model,
-          'messages': messages,
-          'temperature': 0.7,
-          'max_tokens': 4000,
-        }),
-      );
+      streamedResponse = await _http.send(request);
     } catch (_) {
       throw const CerebrasApiException(
         'Could not reach Cerebras. Check your connection and try again.',
       );
     }
 
-    if (response.statusCode == 401 || response.statusCode == 403) {
+    if (streamedResponse.statusCode == 401 ||
+        streamedResponse.statusCode == 403) {
       throw const ApiKeyRejectedException();
     }
-    if (response.statusCode != 200) {
+    if (streamedResponse.statusCode != 200) {
       throw CerebrasApiException(
-        'Cerebras returned an error (HTTP ${response.statusCode}). Please try again.',
+        'Cerebras returned an error (HTTP ${streamedResponse.statusCode}). Please try again.',
       );
     }
 
-    late final Map<String, dynamic> decoded;
+    final buffer = StringBuffer();
     try {
-      decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final lines = streamedResponse.stream
+          .transform(utf8.decoder)
+          .transform(const LineSplitter());
+      await for (final line in lines) {
+        final trimmed = line.trim();
+        if (trimmed.isEmpty || !trimmed.startsWith('data:')) continue;
+        final data = trimmed.substring(5).trim();
+        if (data == '[DONE]') break;
+
+        final Map<String, dynamic> event;
+        try {
+          event = jsonDecode(data) as Map<String, dynamic>;
+        } catch (_) {
+          // Skip a malformed SSE chunk rather than aborting the whole stream.
+          continue;
+        }
+        final choices = event['choices'] as List?;
+        if (choices == null || choices.isEmpty) continue;
+        final delta = choices.first['delta'] as Map<String, dynamic>?;
+        final content = delta?['content'] as String?;
+        if (content != null && content.isNotEmpty) {
+          buffer.write(content);
+          onProgress?.call(buffer.length);
+        }
+      }
     } catch (_) {
       throw const CerebrasApiException(
-        'Received an unreadable response from Cerebras.',
+        'The connection to Cerebras was interrupted while streaming.',
       );
     }
-    return decoded;
-  }
 
-  String _extractContent(Map<String, dynamic> chatResponse) {
-    final choices = chatResponse['choices'] as List?;
-    if (choices == null || choices.isEmpty) {
-      throw const CerebrasApiException(
-        'Cerebras returned no response content.',
-      );
-    }
-    final message = choices.first['message'] as Map<String, dynamic>?;
-    final content = message?['content'] as String?;
-    if (content == null || content.trim().isEmpty) {
+    if (buffer.isEmpty) {
       throw const CerebrasApiException('Cerebras returned an empty response.');
     }
-    return content;
+    return buffer.toString();
   }
 
   /// Sends [messages], defensively parses the JSON reply, retrying once if
@@ -193,9 +220,13 @@ Rules for populating the schema:
   Future<Map<String, dynamic>> _requestJson({
     required String apiKey,
     required List<Map<String, dynamic>> messages,
+    void Function(int charsReceived)? onProgress,
   }) async {
-    final chatResponse = await _chat(apiKey: apiKey, messages: messages);
-    final rawContent = _extractContent(chatResponse);
+    final rawContent = await _streamChat(
+      apiKey: apiKey,
+      messages: messages,
+      onProgress: onProgress,
+    );
     final cleaned = _stripCodeFences(rawContent);
 
     try {
@@ -211,11 +242,11 @@ Rules for populating the schema:
               'Your last message was not valid JSON. Resend your ENTIRE answer again, as ONE strictly valid JSON object matching the schema from the system prompt. Output nothing except the JSON object: no prose, no markdown code fences.',
         },
       ];
-      final retryResponse = await _chat(
+      final retryRaw = await _streamChat(
         apiKey: apiKey,
         messages: retryMessages,
+        onProgress: onProgress,
       );
-      final retryRaw = _extractContent(retryResponse);
       final retryCleaned = _stripCodeFences(retryRaw);
       try {
         final parsed = jsonDecode(retryCleaned) as Map<String, dynamic>;
@@ -233,12 +264,17 @@ Rules for populating the schema:
     required PreferenceBlock prefs,
     String freeText = '',
     String? deepDiveOnTitle,
+    void Function(int charsReceived)? onProgress,
   }) async {
     final messages = [
       {'role': 'system', 'content': _systemPrompt(prefs)},
       _userTurn(prefs: prefs, freeText: freeText, focusTitle: deepDiveOnTitle),
     ];
-    final json = await _requestJson(apiKey: apiKey, messages: messages);
+    final json = await _requestJson(
+      apiKey: apiKey,
+      messages: messages,
+      onProgress: onProgress,
+    );
     return GenerationResponse.fromJson(json);
   }
 
@@ -247,6 +283,7 @@ Rules for populating the schema:
     required PreferenceBlock prefs,
     required NarrowTopic currentTopic,
     required String refinementInstruction,
+    void Function(int charsReceived)? onProgress,
   }) async {
     final messages = [
       {'role': 'system', 'content': _systemPrompt(prefs)},
@@ -261,7 +298,11 @@ Rules for populating the schema:
         }),
       },
     ];
-    final json = await _requestJson(apiKey: apiKey, messages: messages);
+    final json = await _requestJson(
+      apiKey: apiKey,
+      messages: messages,
+      onProgress: onProgress,
+    );
     final response = GenerationResponse.fromJson(json);
     if (response.narrowTopic == null) {
       throw const CerebrasApiException(

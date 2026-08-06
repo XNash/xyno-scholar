@@ -39,7 +39,9 @@ class OutputPanel extends ConsumerWidget {
                   CircularProgressIndicator(color: colors.teal),
                   const SizedBox(height: 14),
                   Text(
-                    s.generating,
+                    generation.streamedChars > 0
+                        ? s.receiving(generation.streamedChars)
+                        : s.connecting,
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ],

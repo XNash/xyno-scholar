@@ -18,11 +18,17 @@ class GenerationState {
   final GenerationResponse? response;
   final bool isRefining;
 
+  /// Running character count of the streamed reply for the in-flight
+  /// request, purely for a live "receiving…" progress indicator. Reset to 0
+  /// at the start of every call.
+  final int streamedChars;
+
   const GenerationState({
     this.isLoading = false,
     this.error,
     this.response,
     this.isRefining = false,
+    this.streamedChars = 0,
   });
 
   GenerationState copyWith({
@@ -31,12 +37,14 @@ class GenerationState {
     bool clearError = false,
     GenerationResponse? response,
     bool? isRefining,
+    int? streamedChars,
   }) {
     return GenerationState(
       isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
       response: response ?? this.response,
       isRefining: isRefining ?? this.isRefining,
+      streamedChars: streamedChars ?? this.streamedChars,
     );
   }
 }
@@ -45,13 +53,19 @@ class GenerationController extends Notifier<GenerationState> {
   @override
   GenerationState build() => const GenerationState();
 
-  Future<void> _run(Future<GenerationResponse> Function() call) async {
+  Future<void> _run(
+    Future<GenerationResponse> Function(void Function(int) onProgress) call,
+  ) async {
     final apiKey = ref.read(apiKeyProvider).key;
     if (apiKey == null || apiKey.isEmpty) return;
 
-    state = state.copyWith(isLoading: true, clearError: true);
+    state = state.copyWith(isLoading: true, clearError: true, streamedChars: 0);
+    void onProgress(int chars) {
+      state = state.copyWith(streamedChars: chars);
+    }
+
     try {
-      final response = await call();
+      final response = await call(onProgress);
       state = state.copyWith(isLoading: false, response: response);
     } on ApiKeyRejectedException catch (e) {
       ref.read(keyRejectedMessageProvider.notifier).state = e.message;
@@ -73,7 +87,12 @@ class GenerationController extends Notifier<GenerationState> {
     final freeText = ref.read(freeTextProvider);
     final client = ref.read(cerebrasClientProvider);
     await _run(
-      () => client.generate(apiKey: apiKey!, prefs: prefs, freeText: freeText),
+      (onProgress) => client.generate(
+        apiKey: apiKey!,
+        prefs: prefs,
+        freeText: freeText,
+        onProgress: onProgress,
+      ),
     );
   }
 
@@ -82,11 +101,12 @@ class GenerationController extends Notifier<GenerationState> {
     final prefs = ref.read(preferenceBlockProvider);
     final client = ref.read(cerebrasClientProvider);
     await _run(
-      () => client.generate(
+      (onProgress) => client.generate(
         apiKey: apiKey!,
         prefs: prefs.copyWith(),
         freeText: topic.keyKeywords.join(', '),
         deepDiveOnTitle: topic.title,
+        onProgress: onProgress,
       ),
     );
   }
@@ -97,13 +117,19 @@ class GenerationController extends Notifier<GenerationState> {
     final prefs = ref.read(preferenceBlockProvider);
     final client = ref.read(cerebrasClientProvider);
 
-    state = state.copyWith(isLoading: true, isRefining: true, clearError: true);
+    state = state.copyWith(
+      isLoading: true,
+      isRefining: true,
+      clearError: true,
+      streamedChars: 0,
+    );
     try {
       final updated = await client.refine(
         apiKey: apiKey,
         prefs: prefs,
         currentTopic: topic,
         refinementInstruction: instruction,
+        onProgress: (chars) => state = state.copyWith(streamedChars: chars),
       );
       final current = state.response;
       state = state.copyWith(
