@@ -12,18 +12,21 @@ class AppStrings {
 
   // Unlock screen
   String get unlockTitle =>
-      _fr ? 'Entrez votre clé API Cerebras' : 'Enter your Cerebras API key';
+      _fr ? 'Entrez votre clé API Gemini' : 'Enter your Gemini API key';
   String get unlockSubtitle => _fr
-      ? 'Votre clé reste dans ce navigateur, elle n\'est jamais envoyée ailleurs qu\'à Cerebras.'
-      : 'Your key stays in this browser — it is never sent anywhere but Cerebras.';
-  String get apiKeyLabel => _fr ? 'Clé API Cerebras' : 'Cerebras API key';
+      ? 'Votre clé reste dans ce navigateur, elle n\'est jamais envoyée ailleurs qu\'à Google.'
+      : 'Your key stays in this browser — it is never sent anywhere but Google.';
+  String get apiKeyLabel => _fr ? 'Clé API Gemini' : 'Gemini API key';
+  String get getApiKeyLink => _fr
+      ? 'Obtenir une clé sur Google AI Studio'
+      : 'Get a key from Google AI Studio';
   String get rememberSession => _fr
       ? 'Se souvenir pour cette session de navigateur'
       : 'Remember for this browser session';
   String get unlockButton => _fr ? 'Continuer' : 'Continue';
   String get keyRejected => _fr
-      ? 'Votre clé API a été rejetée par Cerebras.'
-      : 'Your API key was rejected by Cerebras.';
+      ? 'Votre clé API a été rejetée par Gemini.'
+      : 'Your API key was rejected by Gemini.';
   String get forgetKey => _fr ? 'Oublier la clé' : 'Forget key';
 
   // Sidebar — fields
@@ -62,11 +65,6 @@ class AppStrings {
   // Generate
   String get generateButton => _fr ? 'Générer des sujets' : 'Generate topics';
   String get generating => _fr ? 'Génération en cours…' : 'Generating…';
-  String get connecting =>
-      _fr ? 'Connexion à Cerebras…' : 'Connecting to Cerebras…';
-  String receiving(int chars) => _fr
-      ? 'Réception en cours… ${_formatCount(chars)} caractères'
-      : 'Receiving… ${_formatCount(chars)} characters';
 
   // Output
   String get emptyStateTitle => _fr ? 'Prêt à explorer' : 'Ready to explore';
@@ -115,14 +113,4 @@ class AppStrings {
   String get genericError => _fr
       ? 'Une erreur est survenue. Veuillez réessayer.'
       : 'Something went wrong. Please try again.';
-
-  static String _formatCount(int n) {
-    final digits = n.toString();
-    final buffer = StringBuffer();
-    for (var i = 0; i < digits.length; i++) {
-      if (i > 0 && (digits.length - i) % 3 == 0) buffer.write(' ');
-      buffer.write(digits[i]);
-    }
-    return buffer.toString();
-  }
 }

@@ -2,12 +2,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/broad_topic.dart';
 import '../models/generation_response.dart';
 import '../models/narrow_topic.dart';
-import '../services/cerebras_client.dart';
+import '../services/gemini_client.dart';
 import 'api_key_provider.dart';
 import 'preference_providers.dart';
 
-final cerebrasClientProvider = Provider<CerebrasClient>((ref) {
-  final client = CerebrasClient();
+final geminiClientProvider = Provider<GeminiClient>((ref) {
+  final client = GeminiClient();
   ref.onDispose(client.dispose);
   return client;
 });
@@ -18,17 +18,11 @@ class GenerationState {
   final GenerationResponse? response;
   final bool isRefining;
 
-  /// Running character count of the streamed reply for the in-flight
-  /// request, purely for a live "receiving…" progress indicator. Reset to 0
-  /// at the start of every call.
-  final int streamedChars;
-
   const GenerationState({
     this.isLoading = false,
     this.error,
     this.response,
     this.isRefining = false,
-    this.streamedChars = 0,
   });
 
   GenerationState copyWith({
@@ -37,14 +31,12 @@ class GenerationState {
     bool clearError = false,
     GenerationResponse? response,
     bool? isRefining,
-    int? streamedChars,
   }) {
     return GenerationState(
       isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
       response: response ?? this.response,
       isRefining: isRefining ?? this.isRefining,
-      streamedChars: streamedChars ?? this.streamedChars,
     );
   }
 }
@@ -53,30 +45,24 @@ class GenerationController extends Notifier<GenerationState> {
   @override
   GenerationState build() => const GenerationState();
 
-  Future<void> _run(
-    Future<GenerationResponse> Function(void Function(int) onProgress) call,
-  ) async {
+  Future<void> _run(Future<GenerationResponse> Function() call) async {
     final apiKey = ref.read(apiKeyProvider).key;
     if (apiKey == null || apiKey.isEmpty) return;
 
-    state = state.copyWith(isLoading: true, clearError: true, streamedChars: 0);
-    void onProgress(int chars) {
-      state = state.copyWith(streamedChars: chars);
-    }
-
+    state = state.copyWith(isLoading: true, clearError: true);
     try {
-      final response = await call(onProgress);
+      final response = await call();
       state = state.copyWith(isLoading: false, response: response);
     } on ApiKeyRejectedException catch (e) {
       ref.read(keyRejectedMessageProvider.notifier).state = e.message;
       ref.read(apiKeyProvider.notifier).forget();
       state = state.copyWith(isLoading: false, clearError: true);
-    } on CerebrasApiException catch (e) {
+    } on GeminiApiException catch (e) {
       state = state.copyWith(isLoading: false, error: e.message);
     } catch (_) {
       state = state.copyWith(
         isLoading: false,
-        error: 'Something went wrong while talking to Cerebras.',
+        error: 'Something went wrong while talking to Gemini.',
       );
     }
   }
@@ -85,28 +71,22 @@ class GenerationController extends Notifier<GenerationState> {
     final apiKey = ref.read(apiKeyProvider).key;
     final prefs = ref.read(preferenceBlockProvider);
     final freeText = ref.read(freeTextProvider);
-    final client = ref.read(cerebrasClientProvider);
+    final client = ref.read(geminiClientProvider);
     await _run(
-      (onProgress) => client.generate(
-        apiKey: apiKey!,
-        prefs: prefs,
-        freeText: freeText,
-        onProgress: onProgress,
-      ),
+      () => client.generate(apiKey: apiKey!, prefs: prefs, freeText: freeText),
     );
   }
 
   Future<void> deepDive(BroadTopic topic) async {
     final apiKey = ref.read(apiKeyProvider).key;
     final prefs = ref.read(preferenceBlockProvider);
-    final client = ref.read(cerebrasClientProvider);
+    final client = ref.read(geminiClientProvider);
     await _run(
-      (onProgress) => client.generate(
+      () => client.generate(
         apiKey: apiKey!,
         prefs: prefs.copyWith(),
         freeText: topic.keyKeywords.join(', '),
         deepDiveOnTitle: topic.title,
-        onProgress: onProgress,
       ),
     );
   }
@@ -115,21 +95,15 @@ class GenerationController extends Notifier<GenerationState> {
     final apiKey = ref.read(apiKeyProvider).key;
     if (apiKey == null || apiKey.isEmpty) return;
     final prefs = ref.read(preferenceBlockProvider);
-    final client = ref.read(cerebrasClientProvider);
+    final client = ref.read(geminiClientProvider);
 
-    state = state.copyWith(
-      isLoading: true,
-      isRefining: true,
-      clearError: true,
-      streamedChars: 0,
-    );
+    state = state.copyWith(isLoading: true, isRefining: true, clearError: true);
     try {
       final updated = await client.refine(
         apiKey: apiKey,
         prefs: prefs,
         currentTopic: topic,
         refinementInstruction: instruction,
-        onProgress: (chars) => state = state.copyWith(streamedChars: chars),
       );
       final current = state.response;
       state = state.copyWith(
@@ -150,7 +124,7 @@ class GenerationController extends Notifier<GenerationState> {
         isRefining: false,
         clearError: true,
       );
-    } on CerebrasApiException catch (e) {
+    } on GeminiApiException catch (e) {
       state = state.copyWith(
         isLoading: false,
         isRefining: false,

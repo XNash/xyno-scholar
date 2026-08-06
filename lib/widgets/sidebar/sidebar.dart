@@ -69,11 +69,7 @@ class Sidebar extends ConsumerWidget {
                       )
                     : const Icon(LucideIcons.sparkles, size: 18),
                 label: Text(
-                  generation.isLoading
-                      ? (generation.streamedChars > 0
-                            ? s.receiving(generation.streamedChars)
-                            : s.connecting)
-                      : s.generateButton,
+                  generation.isLoading ? s.generating : s.generateButton,
                 ),
               ),
             ),
