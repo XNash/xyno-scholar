@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../l10n/strings.dart';
 import '../../providers/generation_provider.dart';
 import '../../providers/preference_providers.dart';
+import '../../screens/narrow_topic_screen.dart';
 import '../../theme/app_colors.dart';
 import '../common/markdown_text.dart';
 import 'broad_topics_list.dart';
@@ -31,9 +32,23 @@ class OutputPanel extends ConsumerWidget {
             onDismiss: () => ref.read(generationProvider.notifier).clearError(),
             retryLabel: s.retry,
             onRetry: generation.failedDeepDiveTopic != null
-                ? () => ref
-                      .read(generationProvider.notifier)
-                      .deepDive(generation.failedDeepDiveTopic!)
+                ? () async {
+                    final topic = generation.failedDeepDiveTopic!;
+                    final narrow = await ref
+                        .read(generationProvider.notifier)
+                        .deepDive(topic);
+                    if (narrow != null && context.mounted) {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => NarrowTopicScreen(
+                            initialTopic: narrow,
+                            fieldsCovered: topic.fieldsCovered,
+                            language: prefs.language,
+                          ),
+                        ),
+                      );
+                    }
+                  }
                 : null,
           ),
         if (generation.isLoading && generation.response == null)
@@ -99,6 +114,10 @@ class _ResponseContent extends ConsumerWidget {
             topic: response.narrowTopic!,
             fieldsCovered: response.fieldsCovered,
             language: response.language,
+            isRefining: generation.isLoading && generation.isRefining,
+            onRefine: (instruction) => ref
+                .read(generationProvider.notifier)
+                .refine(response.narrowTopic!, instruction),
           )
         else if (response.broadTopics.isNotEmpty)
           BroadTopicsList(topics: response.broadTopics)

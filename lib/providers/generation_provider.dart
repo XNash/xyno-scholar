@@ -98,29 +98,55 @@ class GenerationController extends Notifier<GenerationState> {
     );
   }
 
-  Future<void> deepDive(BroadTopic topic) async {
+  /// Fetches a single narrow topic seeded with [topic] and returns it for
+  /// the caller to navigate to a dedicated detail page - unlike [generate],
+  /// this deliberately does NOT overwrite [GenerationState.response], so the
+  /// broad topics list underneath is untouched whether the caller navigates
+  /// away or the request fails.
+  Future<NarrowTopic?> deepDive(BroadTopic topic) async {
     final apiKey = ref.read(apiKeyProvider).key;
+    if (apiKey == null || apiKey.isEmpty) {
+      state = state.copyWith(
+        error: 'No API key is set. Please unlock the app again.',
+      );
+      return null;
+    }
     final prefs = ref.read(preferenceBlockProvider);
     final client = ref.read(mistralClientProvider);
     state = state.copyWith(
       activeDeepDiveId: topic.id,
       clearFailedDeepDiveTopic: true,
+      clearError: true,
     );
     try {
-      await _run(
-        () => client.generate(
-          apiKey: apiKey!,
-          // Deep dive always requests a single narrow topic seeded with the
-          // clicked broad topic, regardless of the sidebar's broad/narrow
-          // scope toggle - hence the explicit override here.
-          prefs: prefs.copyWith(scope: Scope.narrow),
-          freeText: topic.keyKeywords.join(', '),
-          deepDiveOnTitle: topic.title,
-        ),
+      final response = await client.generate(
+        apiKey: apiKey,
+        // Deep dive always requests a single narrow topic seeded with the
+        // clicked broad topic, regardless of the sidebar's broad/narrow
+        // scope toggle - hence the explicit override here.
+        prefs: prefs.copyWith(scope: Scope.narrow),
+        freeText: topic.keyKeywords.join(', '),
+        deepDiveOnTitle: topic.title,
       );
-      if (state.error != null) {
-        state = state.copyWith(failedDeepDiveTopic: topic);
+      if (response.narrowTopic == null) {
+        throw const MistralApiException(
+          'Mistral did not return a narrow topic for this deep dive.',
+        );
       }
+      return response.narrowTopic;
+    } on ApiKeyRejectedException catch (e) {
+      ref.read(keyRejectedMessageProvider.notifier).state = e.message;
+      ref.read(apiKeyProvider.notifier).forget();
+      return null;
+    } on MistralApiException catch (e) {
+      state = state.copyWith(error: e.message, failedDeepDiveTopic: topic);
+      return null;
+    } catch (_) {
+      state = state.copyWith(
+        error: 'Something went wrong while talking to Mistral.',
+        failedDeepDiveTopic: topic,
+      );
+      return null;
     } finally {
       state = state.copyWith(clearActiveDeepDiveId: true);
     }
