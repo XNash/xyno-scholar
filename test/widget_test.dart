@@ -8,6 +8,6 @@ void main() {
     await tester.pumpWidget(const ProviderScope(child: XynoScholarApp()));
     await tester.pumpAndSettle();
 
-    expect(find.text('Entrez votre clé API Cerebras'), findsOneWidget);
+    expect(find.text('Entrez votre clé API Gemini'), findsOneWidget);
   });
 }

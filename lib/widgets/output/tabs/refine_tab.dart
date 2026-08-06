@@ -96,7 +96,11 @@ class _RefineTabState extends ConsumerState<RefineTab> {
                       ),
                     )
                   : const Icon(LucideIcons.wand2, size: 16),
-              label: Text(s.refineButton),
+              label: Text(
+                generation.isLoading && generation.isRefining
+                    ? s.generating
+                    : s.refineButton,
+              ),
             ),
           ),
         ],

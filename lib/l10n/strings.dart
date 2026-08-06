@@ -12,18 +12,21 @@ class AppStrings {
 
   // Unlock screen
   String get unlockTitle =>
-      _fr ? 'Entrez votre clé API Cerebras' : 'Enter your Cerebras API key';
+      _fr ? 'Entrez votre clé API Gemini' : 'Enter your Gemini API key';
   String get unlockSubtitle => _fr
-      ? 'Votre clé reste dans ce navigateur, elle n\'est jamais envoyée ailleurs qu\'à Cerebras.'
-      : 'Your key stays in this browser — it is never sent anywhere but Cerebras.';
-  String get apiKeyLabel => _fr ? 'Clé API Cerebras' : 'Cerebras API key';
+      ? 'Votre clé reste dans ce navigateur, elle n\'est jamais envoyée ailleurs qu\'à Google.'
+      : 'Your key stays in this browser — it is never sent anywhere but Google.';
+  String get apiKeyLabel => _fr ? 'Clé API Gemini' : 'Gemini API key';
+  String get getApiKeyLink => _fr
+      ? 'Obtenir une clé sur Google AI Studio'
+      : 'Get a key from Google AI Studio';
   String get rememberSession => _fr
       ? 'Se souvenir pour cette session de navigateur'
       : 'Remember for this browser session';
   String get unlockButton => _fr ? 'Continuer' : 'Continue';
   String get keyRejected => _fr
-      ? 'Votre clé API a été rejetée par Cerebras.'
-      : 'Your API key was rejected by Cerebras.';
+      ? 'Votre clé API a été rejetée par Gemini.'
+      : 'Your API key was rejected by Gemini.';
   String get forgetKey => _fr ? 'Oublier la clé' : 'Forget key';
 
   // Sidebar — fields

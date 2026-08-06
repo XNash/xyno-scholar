@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../l10n/strings.dart';
 import '../providers/api_key_provider.dart';
 import '../providers/preference_providers.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
+
+final _googleAiStudioApiKeyUri = Uri.parse(
+  'https://aistudio.google.com/apikey',
+);
 
 class KeyEntryScreen extends ConsumerStatefulWidget {
   const KeyEntryScreen({super.key});
@@ -140,6 +145,26 @@ class _KeyEntryScreenState extends ConsumerState<KeyEntryScreen> {
                           color: colors.ink,
                         ),
                         onSubmitted: (_) => _submit(),
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: () => launchUrl(
+                            _googleAiStudioApiKeyUri,
+                            mode: LaunchMode.externalApplication,
+                          ),
+                          icon: const Icon(LucideIcons.externalLink, size: 14),
+                          label: Text(
+                            s.getApiKeyLink,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            minimumSize: const Size(0, 32),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 12),
                       Row(
