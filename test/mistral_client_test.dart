@@ -5,47 +5,21 @@ import 'package:http/testing.dart';
 import 'package:xyno_scholar/models/enums.dart';
 import 'package:xyno_scholar/models/narrow_topic.dart';
 import 'package:xyno_scholar/models/preference_block.dart';
-import 'package:xyno_scholar/services/gemini_client.dart';
+import 'package:xyno_scholar/services/mistral_client.dart';
 
-/// Wraps [innerJsonText] the way Gemini's `generateContent` response does
-/// when `responseMimeType: "application/json"` is set: the model's JSON
-/// output arrives as the `text` of the first candidate's first part.
-http.Response _generateContentResponse(String innerJsonText) {
+/// Wraps [content] the way an OpenAI-compatible `chat/completions` response
+/// does (the shape returned by the relay Worker, unchanged from Mistral).
+http.Response _chatCompletionResponse(String content) {
   return http.Response(
     jsonEncode({
-      'candidates': [
+      'choices': [
         {
-          'content': {
-            'parts': [
-              {'text': innerJsonText},
-            ],
-            'role': 'model',
-          },
-          'finishReason': 'STOP',
+          'message': {'role': 'assistant', 'content': content},
         },
       ],
     }),
     200,
     headers: {'content-type': 'application/json'},
-  );
-}
-
-http.Response _errorResponse(
-  int statusCode, {
-  String status = 'INVALID_ARGUMENT',
-  String message = 'Something went wrong.',
-  List<Map<String, dynamic>>? details,
-}) {
-  return http.Response(
-    jsonEncode({
-      'error': {
-        'code': statusCode,
-        'message': message,
-        'status': status,
-        if (details != null) 'details': details,
-      },
-    }),
-    statusCode,
   );
 }
 
@@ -61,7 +35,7 @@ final _preferences = PreferenceBlock(
 
 void main() {
   test(
-    'generate() parses a broad-scope response and sends the specified request config',
+    'generate() parses a broad-scope response and posts the specified request config',
     () async {
       final broadJson = jsonEncode({
         'scope': 'broad',
@@ -83,10 +57,10 @@ void main() {
       final capturedRequests = <http.Request>[];
       final mockClient = MockClient((request) async {
         capturedRequests.add(request);
-        return _generateContentResponse(broadJson);
+        return _chatCompletionResponse(broadJson);
       });
 
-      final client = GeminiClient(httpClient: mockClient);
+      final client = MistralClient(httpClient: mockClient);
       final response = await client.generate(
         apiKey: 'test-key',
         prefs: _preferences,
@@ -98,22 +72,14 @@ void main() {
 
       expect(capturedRequests, hasLength(1));
       final request = capturedRequests.single;
-      expect(
-        request.url.toString(),
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent',
-      );
-      expect(request.headers['x-goog-api-key'], 'test-key');
-      expect(request.headers['Authorization'], isNull);
+      expect(request.headers['Authorization'], 'Bearer test-key');
+      expect(request.headers['x-goog-api-key'], isNull);
 
       final body = jsonDecode(request.body) as Map<String, dynamic>;
-      expect(body['systemInstruction'], isNotNull);
+      expect(body['model'], 'mistral-large-latest');
+      expect(body['response_format'], {'type': 'json_object'});
       expect(body.containsKey('stream'), isFalse);
-      final config = body['generationConfig'] as Map<String, dynamic>;
-      expect(config['temperature'], 1.0);
-      expect(config['topP'], 0.95);
-      expect(config['maxOutputTokens'], 65000);
-      expect(config['responseMimeType'], 'application/json');
-      expect(config['responseSchema'], isNotNull);
+      expect((body['messages'] as List).first['role'], 'system');
     },
   );
 
@@ -166,10 +132,10 @@ void main() {
     });
 
     final mockClient = MockClient((request) async {
-      return _generateContentResponse(narrowJson);
+      return _chatCompletionResponse(narrowJson);
     });
 
-    final client = GeminiClient(httpClient: mockClient);
+    final client = MistralClient(httpClient: mockClient);
     final response = await client.generate(
       apiKey: 'test-key',
       prefs: _preferences.copyWith(scope: Scope.narrow),
@@ -231,10 +197,10 @@ void main() {
     });
 
     final mockClient = MockClient((request) async {
-      return _generateContentResponse(refinedJson);
+      return _chatCompletionResponse(refinedJson);
     });
 
-    final client = GeminiClient(httpClient: mockClient);
+    final client = MistralClient(httpClient: mockClient);
     final updated = await client.refine(
       apiKey: 'test-key',
       prefs: _preferences.copyWith(scope: Scope.narrow),
@@ -249,6 +215,29 @@ void main() {
       updated.refinementSummary,
       'Shifted the period to the 18th century.',
     );
+  });
+
+  test('generate() strips markdown code fences before parsing', () async {
+    final validJson = jsonEncode({
+      'scope': 'broad',
+      'language': 'en',
+      'fieldsCovered': ['history'],
+      'clarifyingQuestion': null,
+      'broadTopics': <Map<String, dynamic>>[],
+      'narrowTopic': null,
+    });
+
+    final mockClient = MockClient((request) async {
+      return _chatCompletionResponse('```json\n$validJson\n```');
+    });
+
+    final client = MistralClient(httpClient: mockClient);
+    final response = await client.generate(
+      apiKey: 'test-key',
+      prefs: _preferences,
+    );
+
+    expect(response.scope, 'broad');
   });
 
   test(
@@ -266,12 +255,12 @@ void main() {
 
       final mockClient = MockClient((request) async {
         callCount++;
-        return _generateContentResponse(
+        return _chatCompletionResponse(
           callCount == 1 ? 'this is not JSON at all' : validJson,
         );
       });
 
-      final client = GeminiClient(httpClient: mockClient);
+      final client = MistralClient(httpClient: mockClient);
       final response = await client.generate(
         apiKey: 'test-key',
         prefs: _preferences,
@@ -286,79 +275,38 @@ void main() {
     'generate() throws after a second invalid-JSON response (retry exhausted)',
     () async {
       final mockClient = MockClient((request) async {
-        return _generateContentResponse('still not JSON');
+        return _chatCompletionResponse('still not JSON');
       });
 
-      final client = GeminiClient(httpClient: mockClient);
+      final client = MistralClient(httpClient: mockClient);
       expect(
         () => client.generate(apiKey: 'test-key', prefs: _preferences),
-        throwsA(isA<GeminiApiException>()),
+        throwsA(isA<MistralApiException>()),
       );
     },
   );
 
-  test('generate() throws ApiKeyRejectedException on 403', () async {
+  test('generate() throws ApiKeyRejectedException on 401', () async {
     final mockClient = MockClient((request) async {
-      return _errorResponse(
-        403,
-        status: 'PERMISSION_DENIED',
-        message: 'Permission denied.',
-      );
+      return http.Response('{"error":"invalid api key"}', 401);
     });
 
-    final client = GeminiClient(httpClient: mockClient);
+    final client = MistralClient(httpClient: mockClient);
     expect(
       () => client.generate(apiKey: 'bad-key', prefs: _preferences),
       throwsA(isA<ApiKeyRejectedException>()),
     );
   });
 
-  test(
-    'generate() throws ApiKeyRejectedException on 400 API_KEY_INVALID',
-    () async {
-      final mockClient = MockClient((request) async {
-        return _errorResponse(
-          400,
-          message: 'API key not valid. Please pass a valid API key.',
-          details: [
-            {
-              '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
-              'reason': 'API_KEY_INVALID',
-              'domain': 'googleapis.com',
-            },
-          ],
-        );
-      });
+  test('generate() throws ApiKeyRejectedException on 403', () async {
+    final mockClient = MockClient((request) async {
+      return http.Response('{"error":"forbidden"}', 403);
+    });
 
-      final client = GeminiClient(httpClient: mockClient);
-      expect(
-        () => client.generate(apiKey: 'bad-key', prefs: _preferences),
-        throwsA(
-          isA<ApiKeyRejectedException>().having(
-            (e) => e.message,
-            'message',
-            contains('API key'),
-          ),
-        ),
-      );
-    },
-  );
-
-  test(
-    'generate() surfaces a plain 400 (unrelated to the key) as GeminiApiException',
-    () async {
-      final mockClient = MockClient((request) async {
-        return _errorResponse(
-          400,
-          message: 'Request contains an invalid argument.',
-        );
-      });
-
-      final client = GeminiClient(httpClient: mockClient);
-      expect(
-        () => client.generate(apiKey: 'test-key', prefs: _preferences),
-        throwsA(isA<GeminiApiException>()),
-      );
-    },
-  );
+    final client = MistralClient(httpClient: mockClient);
+    expect(
+      () => client.generate(apiKey: 'bad-key', prefs: _preferences),
+      throwsA(isA<ApiKeyRejectedException>()),
+    );
+  });
 }

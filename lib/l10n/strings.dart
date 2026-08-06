@@ -12,21 +12,21 @@ class AppStrings {
 
   // Unlock screen
   String get unlockTitle =>
-      _fr ? 'Entrez votre clé API Gemini' : 'Enter your Gemini API key';
+      _fr ? 'Entrez votre clé API Mistral' : 'Enter your Mistral API key';
   String get unlockSubtitle => _fr
-      ? 'Votre clé reste dans ce navigateur, elle n\'est jamais envoyée ailleurs qu\'à Google.'
-      : 'Your key stays in this browser — it is never sent anywhere but Google.';
-  String get apiKeyLabel => _fr ? 'Clé API Gemini' : 'Gemini API key';
+      ? 'Votre clé reste dans ce navigateur. Elle n\'est envoyée qu\'avec chaque requête, via un relais sans état, jusqu\'à Mistral — jamais stockée nulle part ailleurs.'
+      : 'Your key stays in this browser. It is only ever sent with each request, via a stateless relay, to Mistral — never stored anywhere else.';
+  String get apiKeyLabel => _fr ? 'Clé API Mistral' : 'Mistral API key';
   String get getApiKeyLink => _fr
-      ? 'Obtenir une clé sur Google AI Studio'
-      : 'Get a key from Google AI Studio';
+      ? 'Obtenir une clé sur console.mistral.ai'
+      : 'Get a key from console.mistral.ai';
   String get rememberSession => _fr
       ? 'Se souvenir pour cette session de navigateur'
       : 'Remember for this browser session';
   String get unlockButton => _fr ? 'Continuer' : 'Continue';
   String get keyRejected => _fr
-      ? 'Votre clé API a été rejetée par Gemini.'
-      : 'Your API key was rejected by Gemini.';
+      ? 'Votre clé API a été rejetée par Mistral.'
+      : 'Your API key was rejected by Mistral.';
   String get forgetKey => _fr ? 'Oublier la clé' : 'Forget key';
 
   // Sidebar — fields
