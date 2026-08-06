@@ -47,6 +47,6 @@ final apiKeyProvider = NotifierProvider<ApiKeyController, ApiKeyState>(
   ApiKeyController.new,
 );
 
-/// Set when Gemini rejects the current key. The unlock screen reads this
+/// Set when Mistral rejects the current key. The unlock screen reads this
 /// to show a clear "key was rejected" message.
 final keyRejectedMessageProvider = StateProvider<String?>((ref) => null);

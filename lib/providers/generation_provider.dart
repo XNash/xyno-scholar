@@ -2,12 +2,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/broad_topic.dart';
 import '../models/generation_response.dart';
 import '../models/narrow_topic.dart';
-import '../services/gemini_client.dart';
+import '../services/mistral_client.dart';
 import 'api_key_provider.dart';
 import 'preference_providers.dart';
 
-final geminiClientProvider = Provider<GeminiClient>((ref) {
-  final client = GeminiClient();
+final mistralClientProvider = Provider<MistralClient>((ref) {
+  final client = MistralClient();
   ref.onDispose(client.dispose);
   return client;
 });
@@ -57,12 +57,12 @@ class GenerationController extends Notifier<GenerationState> {
       ref.read(keyRejectedMessageProvider.notifier).state = e.message;
       ref.read(apiKeyProvider.notifier).forget();
       state = state.copyWith(isLoading: false, clearError: true);
-    } on GeminiApiException catch (e) {
+    } on MistralApiException catch (e) {
       state = state.copyWith(isLoading: false, error: e.message);
     } catch (_) {
       state = state.copyWith(
         isLoading: false,
-        error: 'Something went wrong while talking to Gemini.',
+        error: 'Something went wrong while talking to Mistral.',
       );
     }
   }
@@ -71,7 +71,7 @@ class GenerationController extends Notifier<GenerationState> {
     final apiKey = ref.read(apiKeyProvider).key;
     final prefs = ref.read(preferenceBlockProvider);
     final freeText = ref.read(freeTextProvider);
-    final client = ref.read(geminiClientProvider);
+    final client = ref.read(mistralClientProvider);
     await _run(
       () => client.generate(apiKey: apiKey!, prefs: prefs, freeText: freeText),
     );
@@ -80,7 +80,7 @@ class GenerationController extends Notifier<GenerationState> {
   Future<void> deepDive(BroadTopic topic) async {
     final apiKey = ref.read(apiKeyProvider).key;
     final prefs = ref.read(preferenceBlockProvider);
-    final client = ref.read(geminiClientProvider);
+    final client = ref.read(mistralClientProvider);
     await _run(
       () => client.generate(
         apiKey: apiKey!,
@@ -95,7 +95,7 @@ class GenerationController extends Notifier<GenerationState> {
     final apiKey = ref.read(apiKeyProvider).key;
     if (apiKey == null || apiKey.isEmpty) return;
     final prefs = ref.read(preferenceBlockProvider);
-    final client = ref.read(geminiClientProvider);
+    final client = ref.read(mistralClientProvider);
 
     state = state.copyWith(isLoading: true, isRefining: true, clearError: true);
     try {
@@ -124,7 +124,7 @@ class GenerationController extends Notifier<GenerationState> {
         isRefining: false,
         clearError: true,
       );
-    } on GeminiApiException catch (e) {
+    } on MistralApiException catch (e) {
       state = state.copyWith(
         isLoading: false,
         isRefining: false,
