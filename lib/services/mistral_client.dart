@@ -30,9 +30,7 @@ class MistralClient {
   /// doesn't reliably answer browser CORS preflight requests. The relay is
   /// a stateless passthrough — it never sees or stores the key beyond the
   /// single forwarded request. See worker/README.md.
-  // TODO(deploy): replace with the real deployed Worker URL once
-  // `wrangler deploy` has run (see worker/README.md).
-  static const _relayUrl = 'https://xyno-scholar-relay.workers.dev';
+  static const _relayUrl = 'https://xyno-scholar-relay.xyno-scholar.workers.dev';
   static const _model = 'mistral-large-latest';
 
   final http.Client _http;
